@@ -5,8 +5,6 @@ import 'package:tokam/features/overlay/presentation/windows/floating_bubble_elem
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase is intentionally skipped until google-services.json is placed in android/app/
-  // and SHA-1 is registered. The app functions fully without it for screen scanning & TTS.
   runApp(const OverlayApp());
 }
 
@@ -17,7 +15,7 @@ void overlayMain() {
   runApp(
     const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: FloatingBubbleElement(),
+      home: OverlayEntryPoint(),
     ),
   );
 }
