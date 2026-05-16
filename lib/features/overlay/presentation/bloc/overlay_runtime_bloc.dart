@@ -1,67 +1,105 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tokam/core/services/ai_assistant_service.dart';
 
-// Discrete States
-enum OverlayViewStatus { closed, listening, processing, speaking, dispatchReady }
+// ── States ──────────────────────────────────────────────────────────────────
+enum OverlayViewStatus { idle, scanned, processing, speaking, error }
 
 class OverlayRuntimeState {
-  final OverlayViewStatus currentStatus;
-  final String activeScreenScrapedText;
-  final String localVoicePlaybackTarget;
+  final OverlayViewStatus status;
+  final String scrapedText;
+  final String outputText;
+  final String errorMessage;
 
-  OverlayRuntimeState({
-    required this.currentStatus,
-    this.activeScreenScrapedText = '',
-    this.localVoicePlaybackTarget = '',
+  const OverlayRuntimeState({
+    this.status = OverlayViewStatus.idle,
+    this.scrapedText = '',
+    this.outputText = '',
+    this.errorMessage = '',
   });
 
   OverlayRuntimeState copyWith({
-    OverlayViewStatus? currentStatus,
-    String? activeScreenScrapedText,
-    String? localVoicePlaybackTarget,
-  }) {
-    return OverlayRuntimeState(
-      currentStatus: currentStatus ?? this.currentStatus,
-      activeScreenScrapedText: activeScreenScrapedText ?? this.activeScreenScrapedText,
-      localVoicePlaybackTarget: localVoicePlaybackTarget ?? this.localVoicePlaybackTarget,
-    );
-  }
+    OverlayViewStatus? status,
+    String? scrapedText,
+    String? outputText,
+    String? errorMessage,
+  }) =>
+      OverlayRuntimeState(
+        status: status ?? this.status,
+        scrapedText: scrapedText ?? this.scrapedText,
+        outputText: outputText ?? this.outputText,
+        errorMessage: errorMessage ?? this.errorMessage,
+      );
 }
 
-// Concrete Execution Events
+// ── Events ───────────────────────────────────────────────────────────────────
 abstract class OverlayRuntimeEvent {}
-class TriggerEngagementBubbleTap extends OverlayRuntimeEvent {}
-class ScreenTextScrapeComplete extends OverlayRuntimeEvent { final String parsedText; ScreenTextScrapeComplete(this.parsedText); }
-class OfflineTranslationComplete extends OverlayRuntimeEvent { final String spokenTextPath; OfflineTranslationComplete(this.spokenTextPath); }
-class VoiceReadingFinished extends OverlayRuntimeEvent {}
 
-// Bloc Processor Implementation Engine
+/// Fired when bubble is tapped – reads SharedPrefs for latest screen text
+class ScanCurrentScreen extends OverlayRuntimeEvent {}
+
+/// User chose "Read Screen" action
+class RequestReadScreen extends OverlayRuntimeEvent {}
+
+/// User chose "Translate" action
+class RequestTranslate extends OverlayRuntimeEvent {}
+
+/// User chose "Summarize" action
+class RequestSummarize extends OverlayRuntimeEvent {}
+
+/// Stop TTS playback
+class StopSpeaking extends OverlayRuntimeEvent {}
+
+// ── Bloc ─────────────────────────────────────────────────────────────────────
 class OverlayRuntimeBloc extends Bloc<OverlayRuntimeEvent, OverlayRuntimeState> {
-  OverlayRuntimeBloc() : super(OverlayRuntimeState(currentStatus: OverlayViewStatus.closed)) {
-    
-    on<TriggerEngagementBubbleTap>((event, emit) {
-      if (state.currentStatus == OverlayViewStatus.closed) {
-        emit(state.copyWith(currentStatus: OverlayViewStatus.listening));
-      } else {
-        emit(state.copyWith(currentStatus: OverlayViewStatus.closed));
-      }
-    });
+  final AiAssistantService _ai;
 
-    on<ScreenTextScrapeComplete>((event, emit) {
+  OverlayRuntimeBloc({AiAssistantService? aiService})
+      : _ai = aiService ?? AiAssistantService(),
+        super(const OverlayRuntimeState()) {
+
+    on<ScanCurrentScreen>(_onScan);
+    on<RequestReadScreen>(_onRead);
+    on<RequestTranslate>(_onTranslate);
+    on<RequestSummarize>(_onSummarize);
+    on<StopSpeaking>(_onStop);
+  }
+
+  Future<void> _onScan(ScanCurrentScreen event, Emitter<OverlayRuntimeState> emit) async {
+    final text = await AiAssistantService.getScrapedScreenText();
+    if (text.isEmpty) {
       emit(state.copyWith(
-        currentStatus: OverlayViewStatus.processing,
-        activeScreenScrapedText: event.parsedText,
+        status: OverlayViewStatus.error,
+        errorMessage: 'No screen content found. Please open an app and try again.',
       ));
-    });
+      return;
+    }
+    emit(state.copyWith(status: OverlayViewStatus.scanned, scrapedText: text));
+  }
 
-    on<OfflineTranslationComplete>((event, emit) {
-      emit(state.copyWith(
-        currentStatus: OverlayViewStatus.speaking,
-        localVoicePlaybackTarget: event.spokenTextPath,
-      ));
-    });
+  Future<void> _onRead(RequestReadScreen event, Emitter<OverlayRuntimeState> emit) async {
+    emit(state.copyWith(status: OverlayViewStatus.speaking, outputText: state.scrapedText));
+    final lang = await AiAssistantService.getSelectedLanguage();
+    await _ai.readText(state.scrapedText, lang);
+  }
 
-    on<VoiceReadingFinished>((event, emit) {
-      emit(state.copyWith(currentStatus: OverlayViewStatus.dispatchReady));
-    });
+  Future<void> _onTranslate(RequestTranslate event, Emitter<OverlayRuntimeState> emit) async {
+    emit(state.copyWith(status: OverlayViewStatus.processing));
+    final lang = await AiAssistantService.getSelectedLanguage();
+    final translated = await _ai.translateText(state.scrapedText, lang);
+    emit(state.copyWith(status: OverlayViewStatus.speaking, outputText: translated));
+    await _ai.readText(translated, lang);
+  }
+
+  Future<void> _onSummarize(RequestSummarize event, Emitter<OverlayRuntimeState> emit) async {
+    emit(state.copyWith(status: OverlayViewStatus.processing));
+    final lang = await AiAssistantService.getSelectedLanguage();
+    final summary = await _ai.summarizeText(state.scrapedText, lang);
+    emit(state.copyWith(status: OverlayViewStatus.speaking, outputText: summary));
+    await _ai.readText(summary, lang);
+  }
+
+  Future<void> _onStop(StopSpeaking event, Emitter<OverlayRuntimeState> emit) async {
+    await _ai.stopSpeaking();
+    emit(state.copyWith(status: OverlayViewStatus.scanned));
   }
 }

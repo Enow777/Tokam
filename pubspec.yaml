@@ -44,8 +44,9 @@ dependencies:
   encrypted_shared_preferences: ^3.0.1
   path_provider: ^2.1.2
   permission_handler: ^11.3.1
-  sherpa_onnx: ^1.10.13
-
+  google_generative_ai: ^0.4.6
+  flutter_tts: ^4.0.2
+  shared_preferences: ^2.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

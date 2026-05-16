@@ -1,33 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:tokam/core/constants/colors.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:tokam/features/onboarding/presentation/screens/auth_screen.dart' as tokam_auth;
+import 'package:tokam/core/services/ai_assistant_service.dart';
+import 'package:tokam/features/onboarding/presentation/screens/permission_gate_screen.dart';
 
-class LanguageSelectorScreen extends StatelessWidget {
-  final AudioPlayer _player = AudioPlayer();
+class LanguageSelectorScreen extends StatefulWidget {
+  const LanguageSelectorScreen({super.key});
+
+  @override
+  State<LanguageSelectorScreen> createState() => _LanguageSelectorScreenState();
+}
+
+class _LanguageSelectorScreenState extends State<LanguageSelectorScreen> {
+  String? _selectedCode;
 
   final List<Map<String, String>> languages = [
-    {'name': 'Cameroonian Pidgin', 'code': 'pcm', 'audio': 'pidgin_intro.mp3'},
-    {'name': 'Ngemba', 'code': 'nge', 'audio': 'ngemba_intro.mp3'},
-    {'name': 'Kom', 'code': 'kom', 'audio': 'kom_intro.mp3'},
-    {'name': 'Meta', 'code': 'mta', 'audio': 'meta_intro.mp3'},
+    {'name': 'Cameroonian Pidgin', 'code': 'pcm', 'emoji': '🇨🇲'},
+    {'name': 'Ngemba', 'code': 'nge', 'emoji': '🗣️'},
+    {'name': 'Kom', 'code': 'kom', 'emoji': '🎙️'},
+    {'name': 'Meta', 'code': 'mta', 'emoji': '🌍'},
   ];
 
-  LanguageSelectorScreen({super.key});
+  Future<void> _onSelect(String code) async {
+    setState(() => _selectedCode = code);
+    // Persist for use by overlay service
+    await AiAssistantService.saveSelectedLanguage(code);
+    // Preview TTS voice
+    final ai = AiAssistantService();
+    await ai.readText('Language selected.', code);
+  }
 
-  void _playFeedback(BuildContext context, String assetPath) async {
-    try {
-      await _player.play(AssetSource('audio/$assetPath'));
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Audio playback simulated (assets missing)."),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
+  void _onContinue() {
+    if (_selectedCode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a language first.')),
+      );
+      return;
     }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const PermissionGateScreen()),
+    );
   }
 
   @override
@@ -39,14 +51,32 @@ class LanguageSelectorScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Select Your Language",
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Choose the language you want the assistant to speak.",
-                style: Theme.of(context).textTheme.bodyMedium,
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryAccent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.translate_rounded,
+                        color: AppColors.primaryAccent, size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Select Language',
+                            style: TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text('Tap to preview the voice',
+                            style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 32),
               Expanded(
@@ -55,48 +85,50 @@ class LanguageSelectorScreen extends StatelessWidget {
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 1,
+                    childAspectRatio: 1.0,
                   ),
                   itemCount: languages.length,
                   itemBuilder: (context, index) {
                     final lang = languages[index];
-                    return InkWell(
-                      onTap: () {
-                        _playFeedback(context, lang['audio']!);
-                        // Save selection
-                      },
-                      child: Container(
+                    final isSelected = _selectedCode == lang['code'];
+                    return GestureDetector(
+                      onTap: () => _onSelect(lang['code']!),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          color: isSelected
+                              ? AppColors.primaryAccent.withValues(alpha: 0.12)
+                              : Colors.grey.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: AppColors.primaryAccent.withValues(alpha: 0.1),
-                            width: 2,
+                            color: isSelected
+                                ? AppColors.primaryAccent
+                                : Colors.grey.withValues(alpha: 0.2),
+                            width: isSelected ? 2 : 1,
                           ),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.volume_up_rounded,
-                              size: 48,
-                              color: AppColors.primaryAccent,
-                            ),
-                            const SizedBox(height: 12),
+                            Text(lang['emoji']!,
+                                style: const TextStyle(fontSize: 40)),
+                            const SizedBox(height: 10),
                             Text(
                               lang['name']!,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: isSelected
+                                    ? AppColors.primaryAccent
+                                    : null,
                               ),
                             ),
+                            if (isSelected)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6),
+                                child: Icon(Icons.check_circle,
+                                    color: AppColors.primaryAccent, size: 18),
+                              ),
                           ],
                         ),
                       ),
@@ -104,17 +136,21 @@ class LanguageSelectorScreen extends StatelessWidget {
                   },
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
+                height: 54,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const tokam_auth.AuthScreen()),
-                    );
-                  },
-                  child: const Text("CONTINUE"),
+                  onPressed: _onContinue,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('CONTINUE',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
