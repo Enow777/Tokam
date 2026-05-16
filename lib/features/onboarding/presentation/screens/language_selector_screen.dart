@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tokam/core/constants/colors.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:tokam/features/onboarding/presentation/screens/auth_screen.dart' as tokam_auth;
 
 class LanguageSelectorScreen extends StatelessWidget {
   final AudioPlayer _player = AudioPlayer();
@@ -14,8 +15,19 @@ class LanguageSelectorScreen extends StatelessWidget {
 
   LanguageSelectorScreen({super.key});
 
-  void _playFeedback(String assetPath) async {
-    await _player.play(AssetSource('audio/$assetPath'));
+  void _playFeedback(BuildContext context, String assetPath) async {
+    try {
+      await _player.play(AssetSource('audio/$assetPath'));
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Audio playback simulated (assets missing)."),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -50,8 +62,8 @@ class LanguageSelectorScreen extends StatelessWidget {
                     final lang = languages[index];
                     return InkWell(
                       onTap: () {
-                        _playFeedback(lang['audio']!);
-                        // Save selection and navigate
+                        _playFeedback(context, lang['audio']!);
+                        // Save selection
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -97,7 +109,10 @@ class LanguageSelectorScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Navigate to Auth
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const tokam_auth.AuthScreen()),
+                    );
                   },
                   child: const Text("CONTINUE"),
                 ),

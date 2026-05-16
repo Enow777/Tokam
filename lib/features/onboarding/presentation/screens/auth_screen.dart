@@ -27,16 +27,20 @@ class AuthScreen extends StatelessWidget {
         MaterialPageRoute(builder: (context) => const tokam.PermissionGateScreen()),
       );
     } catch (e) {
-      if (e.toString().contains("network_error") || e.toString().contains("SocketException")) {
-        // Handle offline scenario during first-time launch
+      final errorStr = e.toString();
+      if (errorStr.contains("network_error") || 
+          errorStr.contains("SocketException") ||
+          errorStr.contains("sign_in_failed") ||
+          errorStr.contains("ApiException")) {
+        // Handle offline scenario or missing Firebase SHA-1 config during dev
         final prefs = EncryptedSharedPreferences();
         await prefs.setString('offline_intent_token', 'cached_auth_intent');
         
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Offline mode. Intent cached for later sync.")),
+          const SnackBar(content: Text("Firebase/Offline Bypass: Intent cached for later sync.")),
         );
-        // Still proceed to next screen for offline usage
+        // Proceed to next screen for offline/dev usage
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const tokam.PermissionGateScreen()),

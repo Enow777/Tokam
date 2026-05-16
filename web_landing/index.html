@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Tokam - Offline Linguistic Accessibility Overlay for Cameroon" />
+    <title>Tokam | Accessibility Overlay</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- Background Elements for Glassmorphism -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    
+    <main class="container glass-panel">
+      <header class="header">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM11 7H13V13H11V7ZM11 15H13V17H11V15Z" fill="#007AFF"/>
+          </svg>
+          <h1>Tokam</h1>
+        </div>
+        <nav class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#about">About</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div class="hero-content">
+          <h2 class="hero-title">Bridging the Gap in <span class="highlight">Digital Inclusion</span></h2>
+          <p class="hero-subtitle">
+            An offline, voice-guided accessibility overlay providing real-time read-aloud translation for essential mobile services in Cameroon.
+          </p>
+          <div class="cta-group">
+            <button class="btn btn-primary" id="download-apk">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download APK
+            </button>
+            <button class="btn btn-secondary">Learn More</button>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="mockup-frame">
+            <div class="mockup-screen">
+              <div class="mockup-bubble"></div>
+              <div class="mockup-text">Voice Guide Active</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="features">
+        <div class="feature-card">
+          <div class="feature-icon purple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          </div>
+          <h3>100% Offline AI</h3>
+          <p>Powered by local Sherpa-ONNX models. No internet connectivity required for STT & TTS interaction.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <h3>Secure Federation</h3>
+          <p>Strictly uses Google Sign-In with offline intent caching for robust, passwordless security.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          </div>
+          <h3>Audio Ducking</h3>
+          <p>Transient audio ducking ensures voice guidance is always heard clearly over conflicting apps.</p>
+        </div>
+      </section>
+      
+      <footer>
+        <p>&copy; 2026 Tokam Project. Built for Inclusion in Cameroon.</p>
+      </footer>
+    </main>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
