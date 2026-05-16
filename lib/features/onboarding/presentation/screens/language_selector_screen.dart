@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tokam/core/constants/colors.dart';
 import 'package:tokam/core/services/ai_assistant_service.dart';
 import 'package:tokam/features/onboarding/presentation/screens/permission_gate_screen.dart';
+import 'package:tokam/features/history/presentation/screens/history_screen.dart';
 
 class LanguageSelectorScreen extends StatefulWidget {
   const LanguageSelectorScreen({super.key});
@@ -45,13 +46,28 @@ class _LanguageSelectorScreenState extends State<LanguageSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: AppColors.primaryAccent),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
               Row(
                 children: [
                   Container(

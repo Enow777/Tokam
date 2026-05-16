@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -132,8 +133,19 @@ class _ExpandedPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withValues(alpha: 0.5),
-      child: SafeArea(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          // Glassmorphism background blur
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Container(
+                color: AppColors.darkBackground.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+          SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -149,6 +161,8 @@ class _ExpandedPanel extends StatelessWidget {
           ],
         ),
       ),
+        ],
+      ),
     );
   }
 }
@@ -159,12 +173,19 @@ class _PanelBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<OverlayRuntimeBloc, OverlayRuntimeState>(
+    return BlocConsumer<OverlayRuntimeBloc, OverlayRuntimeState>(
+      listener: (context, state) async {
+        if (state.status == OverlayViewStatus.chatting) {
+          await FlutterOverlayWindow.updateFlag(OverlayFlag.focusPointer);
+        } else {
+          await FlutterOverlayWindow.updateFlag(OverlayFlag.defaultFlag);
+        }
+      },
       builder: (context, state) {
         return Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF1C1C2E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            color: AppColors.darkSurface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
           child: Column(
@@ -221,6 +242,9 @@ class _PanelBody extends StatelessWidget {
                       context.read<OverlayRuntimeBloc>().add(RequestTranslate()),
                   onSummarize: () =>
                       context.read<OverlayRuntimeBloc>().add(RequestSummarize()),
+                  onAskAi: () {
+                    context.read<OverlayRuntimeBloc>().add(RequestChat(''));
+                  },
                   isBusy: state.status == OverlayViewStatus.speaking,
                 ),
               if (state.status == OverlayViewStatus.error ||
@@ -271,6 +295,8 @@ class _PanelBody extends StatelessWidget {
         );
       case OverlayViewStatus.speaking:
         return _OutputCard(text: state.outputText);
+      case OverlayViewStatus.chatting:
+        return _ChatView(state: state);
       case OverlayViewStatus.error:
         return _StatusTile(
           icon: Icons.warning_amber_rounded,
@@ -418,11 +444,13 @@ class _ActionRow extends StatelessWidget {
   final VoidCallback onRead;
   final VoidCallback onTranslate;
   final VoidCallback onSummarize;
+  final VoidCallback onAskAi;
   final bool isBusy;
   const _ActionRow({
     required this.onRead,
     required this.onTranslate,
     required this.onSummarize,
+    required this.onAskAi,
     required this.isBusy,
   });
   @override
@@ -430,24 +458,24 @@ class _ActionRow extends StatelessWidget {
         children: [
           Expanded(
               child: _Chip(
-                  icon: Icons.hearing_rounded,
-                  label: 'Read',
-                  color: AppColors.primaryAccent,
-                  onTap: isBusy ? null : onRead)),
-          const SizedBox(width: 10),
-          Expanded(
-              child: _Chip(
                   icon: Icons.translate_rounded,
                   label: 'Translate',
-                  color: AppColors.secondaryAccent,
+                  color: AppColors.primaryAccent,
                   onTap: isBusy ? null : onTranslate)),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
               child: _Chip(
                   icon: Icons.auto_awesome_rounded,
                   label: 'Summarize',
-                  color: AppColors.successState,
+                  color: AppColors.secondaryAccent,
                   onTap: isBusy ? null : onSummarize)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: _Chip(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: 'Ask AI',
+                  color: AppColors.successState,
+                  onTap: isBusy ? null : onAskAi)),
         ],
       );
 }
@@ -489,4 +517,103 @@ class _Chip extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _ChatView extends StatefulWidget {
+  final OverlayRuntimeState state;
+  const _ChatView({required this.state});
+
+  @override
+  State<_ChatView> createState() => _ChatViewState();
+}
+
+class _ChatViewState extends State<_ChatView> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.state.chatResponse.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.darkCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Text(
+              widget.state.chatResponse,
+              style: const TextStyle(color: AppColors.darkTextPrimary, fontSize: 14),
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'Ask me anything about the content on your screen...',
+              style: TextStyle(color: AppColors.primaryAccent, fontSize: 13),
+            ),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Type your question...',
+                  hintStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onSubmitted: (val) {
+                  if (val.trim().isNotEmpty) {
+                    context.read<OverlayRuntimeBloc>().add(RequestChat(val.trim()));
+                    _controller.clear();
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              decoration: const BoxDecoration(
+                color: AppColors.primaryAccent,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                onPressed: () {
+                  final val = _controller.text.trim();
+                  if (val.isNotEmpty) {
+                    context.read<OverlayRuntimeBloc>().add(RequestChat(val));
+                    _controller.clear();
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
