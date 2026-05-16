@@ -10,9 +10,11 @@ class PermissionGateScreen extends StatefulWidget {
   State<PermissionGateScreen> createState() => _PermissionGateScreenState();
 }
 
-class _PermissionGateScreenState extends State<PermissionGateScreen> with WidgetsBindingObserver {
+class _PermissionGateScreenState extends State<PermissionGateScreen>
+    with WidgetsBindingObserver {
   bool _isOverlayGranted = false;
   bool _isAccessibilityGranted = false;
+  bool _isActivating = false;
 
   @override
   void initState() {
@@ -27,7 +29,6 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
     super.dispose();
   }
 
-  /// Re-check whenever user returns from Settings
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -36,17 +37,15 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
   }
 
   Future<void> _checkPermissions() async {
-    final overlay = await FlutterOverlayWindow.isPermissionGranted();
-    setState(() {
-      _isOverlayGranted = overlay;
-      // We infer accessibility is granted if overlay was also given (simplification).
-      // A real check would use a MethodChannel back from the service.
-      _isAccessibilityGranted = _isAccessibilityGranted;
-    });
+    try {
+      final overlay = await FlutterOverlayWindow.isPermissionGranted();
+      if (mounted) {
+        setState(() => _isOverlayGranted = overlay);
+      }
+    } catch (_) {}
   }
 
   void _requestOverlay() async {
-    // Deep-link directly to this app's overlay permission page
     try {
       const intent = AndroidIntent(
         action: 'android.settings.action.MANAGE_OVERLAY_PERMISSION',
@@ -54,52 +53,86 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
       );
       await intent.launch();
     } catch (_) {
-      // Fallback to the flutter_overlay_window method
       await FlutterOverlayWindow.requestPermission();
     }
-    // Re-check when user comes back via WidgetsBindingObserver
   }
 
   void _requestAccessibility() async {
-    // Open accessibility settings — Android doesn't allow deep-linking to a
-    // specific service, so we open the list and show the user what to find.
     const intent = AndroidIntent(
       action: 'android.settings.ACCESSIBILITY_SETTINGS',
     );
     await intent.launch();
   }
 
-  void _markAccessibilityDone() {
-    setState(() => _isAccessibilityGranted = true);
-  }
-
   Future<void> _activateSystem() async {
+    setState(() => _isActivating = true);
     try {
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
         overlayTitle: "Tokam Assistant",
-        overlayContent: 'Screen assistant is active',
+        overlayContent: 'Tap the bubble to scan the screen',
         flag: OverlayFlag.defaultFlag,
-        startPosition: const OverlayPosition(-60, 260),
+        startPosition: const OverlayPosition(0, 200),
         height: 130,
         width: 130,
       );
-    } catch (e) {
+      // If we get here the overlay launched successfully
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Overlay started. If bubble is not visible, check "Draw over apps" permission. ($e)'),
-            duration: const Duration(seconds: 4),
+          const SnackBar(
+            content: Text('✅ Tokam bubble is now active! Minimize this app and tap the bubble.'),
+            duration: Duration(seconds: 4),
+            backgroundColor: AppColors.successState,
           ),
         );
       }
+    } catch (e) {
+      if (mounted) {
+        final msg = e.toString().toLowerCase();
+        String hint;
+        if (msg.contains('permission') || msg.contains('overlay')) {
+          hint = 'Please tap "Display Over Other Apps" above and enable the permission for Tokam.';
+        } else {
+          hint = 'Error: $e';
+        }
+        _showErrorDialog(hint);
+      }
     }
+    if (mounted) setState(() => _isActivating = false);
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Could Not Activate'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _requestOverlay();
+            },
+            child: const Text('Open Settings'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Overlay permission is mandatory. Accessibility can be enabled after launch.
-    final canActivate = _isOverlayGranted;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -108,6 +141,8 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
+
+              // Header
               Row(
                 children: [
                   Container(
@@ -124,72 +159,100 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Permissions Required',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        Text('Two permissions needed to scan screens',
-                            style: TextStyle(color: Colors.grey, fontSize: 13)),
+                        Text('Setup Required',
+                            style: TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text('Complete these two steps then activate',
+                            style:
+                                TextStyle(color: Colors.grey, fontSize: 13)),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 32),
-              _PermissionTile(
+
+              // Step 1 — Overlay
+              _StepTile(
+                step: '1',
                 icon: Icons.picture_in_picture_rounded,
-                title: "Display Over Other Apps",
-                subtitle: "Allows the assistant bubble to float on top of any screen.",
+                title: 'Display Over Other Apps',
+                subtitle:
+                    'Lets the Tokam bubble float over any screen. Tap to open Settings → enable for Tokam.',
                 isGranted: _isOverlayGranted,
-                onPressed: _requestOverlay,
+                onTap: _requestOverlay,
               ),
               const SizedBox(height: 16),
-              _PermissionTile(
+
+              // Step 2 — Accessibility
+              _StepTile(
+                step: '2',
                 icon: Icons.accessibility_new_rounded,
-                title: "Accessibility Service",
-                subtitle: "Allows the assistant to read on-screen text for you.",
+                title: 'Accessibility Service',
+                subtitle:
+                    'Lets Tokam read screen text. Tap → find "Tokam" in the list → enable it.',
                 isGranted: _isAccessibilityGranted,
-                onPressed: _requestAccessibility,
-                trailingWidget: _isAccessibilityGranted
+                onTap: _requestAccessibility,
+                trailing: _isAccessibilityGranted
                     ? null
                     : TextButton(
-                        onPressed: _markAccessibilityDone,
-                        child: const Text("I enabled it"),
+                        onPressed: () =>
+                            setState(() => _isAccessibilityGranted = true),
+                        child: const Text('Done ✓'),
                       ),
               ),
-              const SizedBox(height: 12),
-              if (!_isAccessibilityGranted)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.amber, size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'In Accessibility Settings: Find "Tokam" under Installed Apps, enable it, then tap "I enabled it".',
-                          style: TextStyle(fontSize: 12, color: Colors.amber),
-                        ),
-                      ),
-                    ],
-                  ),
+              const SizedBox(height: 20),
+
+              // Info card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryAccent.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: AppColors.primaryAccent.withValues(alpha: 0.2)),
                 ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline,
+                        color: AppColors.primaryAccent, size: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Tap ACTIVATE even if the checkmarks are not showing — the button will still work.',
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.primaryAccent),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const Spacer(),
+
+              // ACTIVATE button — ALWAYS enabled
               SizedBox(
                 width: double.infinity,
-                height: 54,
+                height: 58,
                 child: ElevatedButton.icon(
-                  onPressed: canActivate ? _activateSystem : null,
-                  icon: const Icon(Icons.rocket_launch_rounded),
-                  label: const Text('ACTIVATE ASSISTANT',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  // Always enabled — we handle errors gracefully inside
+                  onPressed: _isActivating ? null : _activateSystem,
+                  icon: _isActivating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.rocket_launch_rounded),
+                  label: Text(
+                    _isActivating ? 'Activating...' : 'ACTIVATE ASSISTANT',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryAccent,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
                   ),
@@ -203,67 +266,87 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
   }
 }
 
-class _PermissionTile extends StatelessWidget {
+// ── Step tile ────────────────────────────────────────────────────────────────
+class _StepTile extends StatelessWidget {
+  final String step;
   final IconData icon;
   final String title;
   final String subtitle;
   final bool isGranted;
-  final VoidCallback onPressed;
-  final Widget? trailingWidget;
+  final VoidCallback onTap;
+  final Widget? trailing;
 
-  const _PermissionTile({
+  const _StepTile({
+    required this.step,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.isGranted,
-    required this.onPressed,
-    this.trailingWidget,
+    required this.onTap,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isGranted
-            ? AppColors.successState.withValues(alpha: 0.07)
-            : Colors.grey.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isGranted ? AppColors.successState : Colors.grey.shade300,
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon,
-              color: isGranted ? AppColors.successState : AppColors.primaryAccent,
-              size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isGranted
+              ? AppColors.successState.withValues(alpha: 0.07)
+              : Colors.grey.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isGranted
+                ? AppColors.successState
+                : AppColors.primaryAccent.withValues(alpha: 0.3),
+            width: 1.5,
           ),
-          const SizedBox(width: 8),
-          if (isGranted)
-            const Icon(Icons.check_circle, color: AppColors.successState)
-          else if (trailingWidget != null)
-            trailingWidget!
-          else
-            IconButton(
-              onPressed: onPressed,
-              icon: const Icon(Icons.arrow_forward_ios_rounded,
-                  color: AppColors.primaryAccent, size: 18),
+        ),
+        child: Row(
+          children: [
+            // Step badge
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isGranted
+                    ? AppColors.successState
+                    : AppColors.primaryAccent,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: isGranted
+                    ? const Icon(Icons.check, color: Colors.white, size: 18)
+                    : Text(step,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
+              ),
             ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 3),
+                  Text(subtitle,
+                      style:
+                          const TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+            ),
+            if (trailing != null) trailing!,
+            if (trailing == null && !isGranted)
+              const Icon(Icons.arrow_forward_ios_rounded,
+                  color: AppColors.primaryAccent, size: 16),
+          ],
+        ),
       ),
     );
   }
