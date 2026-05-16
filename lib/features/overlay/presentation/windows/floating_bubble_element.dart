@@ -35,19 +35,25 @@ class _OverlayEntryPointState extends State<OverlayEntryPoint>
   }
 
   Future<void> _expand() async {
-    // Resize overlay to full screen before showing the panel
-    await FlutterOverlayWindow.resizeOverlay(
-      WindowSize.matchParent,
-      WindowSize.matchParent,
-      true,
-    );
     if (mounted) setState(() => _isExpanded = true);
+    try {
+      await FlutterOverlayWindow.resizeOverlay(
+        WindowSize.matchParent,
+        WindowSize.matchParent,
+        true,
+      );
+    } catch (e) {
+      debugPrint("Expansion resize failed: $e");
+    }
   }
 
   Future<void> _collapse() async {
-    setState(() => _isExpanded = false);
-    // Shrink back to bubble size
-    await FlutterOverlayWindow.resizeOverlay(130, 130, true);
+    if (mounted) setState(() => _isExpanded = false);
+    try {
+      await FlutterOverlayWindow.resizeOverlay(130, 130, true);
+    } catch (e) {
+      debugPrint("Collapse resize failed: $e");
+    }
   }
 
   @override
@@ -79,9 +85,10 @@ class _CollapsedBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: Center(
-        child: GestureDetector(
-          onTap: onTap,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Center(
           child: AnimatedBuilder(
             animation: pulseController,
             builder: (_, child) => Container(
@@ -105,7 +112,7 @@ class _CollapsedBubble extends StatelessWidget {
                 ],
               ),
               child: const Icon(
-                Icons.screen_search_desktop_rounded,
+                Icons.auto_awesome_rounded,
                 color: Colors.white,
                 size: 30,
               ),
