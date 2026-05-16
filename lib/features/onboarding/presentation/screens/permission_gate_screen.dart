@@ -46,12 +46,23 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> with Widget
   }
 
   void _requestOverlay() async {
-    await FlutterOverlayWindow.requestPermission();
-    await Future.delayed(const Duration(seconds: 1));
-    _checkPermissions();
+    // Deep-link directly to this app's overlay permission page
+    try {
+      const intent = AndroidIntent(
+        action: 'android.settings.action.MANAGE_OVERLAY_PERMISSION',
+        data: 'package:com.inclusion.cameroon.accessibility_overlay',
+      );
+      await intent.launch();
+    } catch (_) {
+      // Fallback to the flutter_overlay_window method
+      await FlutterOverlayWindow.requestPermission();
+    }
+    // Re-check when user comes back via WidgetsBindingObserver
   }
 
   void _requestAccessibility() async {
+    // Open accessibility settings — Android doesn't allow deep-linking to a
+    // specific service, so we open the list and show the user what to find.
     const intent = AndroidIntent(
       action: 'android.settings.ACCESSIBILITY_SETTINGS',
     );
