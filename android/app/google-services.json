@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "512679480861",
+    "project_id": "tokam-cb9b9",
+    "storage_bucket": "tokam-cb9b9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:512679480861:android:5dcc8399714a7ca061c0f4",
+        "android_client_info": {
+          "package_name": "com.inclusion.cameroon.accessibility_overlay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeDU1J7LtpEYgaAjuw4TRSy7qkgGTFPT4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
