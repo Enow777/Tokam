@@ -45,7 +45,7 @@ class MainActivity: FlutterActivity() {
 
                 val intentSuccessCallback = systemShortcutManager.createShortcutResultIntent(pinShortcutData)
                 val statusPendingIntent = PendingIntent.getBroadcast(context, 0, intentSuccessCallback, PendingIntent.FLAG_IMMUTABLE)
-                return systemShortcutManager.requestPinShortcut(pinShortcutData, statusPendingIntent)
+                return systemShortcutManager.requestPinShortcut(pinShortcutData, statusPendingIntent.intentSender)
             }
         }
         return false
